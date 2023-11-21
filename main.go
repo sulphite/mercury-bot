@@ -1,24 +1,32 @@
 package main
 
 import (
-	"flag"
+	// "flag"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/joho/godotenv"
 )
 
 // Variables used for command line parameters
-var (
-	Token string
-)
+// var (
+// 	Token string
+// )
 
-func init() {
-	flag.StringVar(&Token, "t", "", "Bot Token")
-	flag.Parse()
-}
+// func init() {
+// flag.StringVar(&Token, "t", "", "Bot Token")
+// flag.Parse()
+// }
 
 func main() {
+	// get token from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	Token := os.Getenv("TOKEN")
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Token)
