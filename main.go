@@ -5,20 +5,41 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 )
 
 // Variables used for command line parameters
-// var (
-// 	Token string
-// )
+var (
+	// 	Token string
+	// create command structure
+	// every command needs a name and description!
+	commands = []*discordgo.ApplicationCommand{
+		{
+			Name:        "test",
+			Description: "Basic command",
+		},
+	}
+	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+		"test": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Hello i'm mercury!",
+				},
+			})
+		},
+	}
+)
 
-// func init() {
-// flag.StringVar(&Token, "t", "", "Bot Token")
-// flag.Parse()
-// }
+func init() {
+	// flag.StringVar(&Token, "t", "", "Bot Token")
+	// flag.Parse()
+
+}
 
 func main() {
 	// get token from .env file
@@ -27,6 +48,7 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 	Token := os.Getenv("TOKEN")
+	AppID := os.Getenv("APP_ID")
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + Token)
@@ -34,6 +56,11 @@ func main() {
 		fmt.Println("error creating Discord session,", err)
 		return
 	}
+	fmt.Println("Discord session successfully created")
+
+	fmt.Println("registering commands...")
+	dg.ApplicationCommandCreate(AppID, "", commands[0])
+	dg.AddHandler(commandHandlers["test"])
 
 	// Register the messageCreate func as a callback for MessageCreate events.
 	dg.AddHandler(messageCreate)
@@ -47,11 +74,12 @@ func main() {
 		fmt.Println("error opening connection,", err)
 		return
 	}
+	fmt.Println("ws connection opened")
 
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
-	// signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
 	// Cleanly close down the Discord session.
