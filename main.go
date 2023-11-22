@@ -22,6 +22,18 @@ var (
 			Name:        "test",
 			Description: "Basic command",
 		},
+		{
+			Name:        "sub",
+			Description: "subscribe to a feed",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "url",
+					Description: "The URL of the feed",
+					Required:    true,
+				},
+			},
+		},
 	}
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"test": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -29,6 +41,15 @@ var (
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: "Hello i'm mercury!",
+				},
+			})
+		},
+		"sub": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			url := i.ApplicationCommandData().Options[0].StringValue()
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "you sent: " + url,
 				},
 			})
 		},
@@ -59,11 +80,22 @@ func main() {
 	fmt.Println("Discord session successfully created")
 
 	fmt.Println("registering commands...")
-	dg.ApplicationCommandCreate(AppID, "", commands[0])
-	dg.AddHandler(commandHandlers["test"])
+	for _, command := range commands {
+		dg.ApplicationCommandCreate(AppID, "", command)
+	}
+	fmt.Println("commands registered.")
+
+	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+
+		name := i.ApplicationCommandData().Name
+
+		if handlerFunc, ok := commandHandlers[name]; ok {
+			handlerFunc(s, i)
+		}
+	})
 
 	// Register the messageCreate func as a callback for MessageCreate events.
-	dg.AddHandler(messageCreate)
+	// dg.AddHandler(messageCreate)
 
 	// In this example, we only care about receiving message events.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
@@ -86,22 +118,22 @@ func main() {
 	dg.Close()
 }
 
-// This function will be called (due to AddHandler above) every time a new
-// message is created on any channel that the authenticated bot has access to.
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+// // This function will be called (due to AddHandler above) every time a new
+// // message is created on any channel that the authenticated bot has access to.
+// func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	// Ignore all messages created by the bot itself
-	// This isn't required in this specific example but it's a good practice.
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
-	// If the message is "ping" reply with "Pong!"
-	if m.Content == "ping" {
-		s.ChannelMessageSend(m.ChannelID, "Pong!")
-	}
+// 	// Ignore all messages created by the bot itself
+// 	// This isn't required in this specific example but it's a good practice.
+// 	if m.Author.ID == s.State.User.ID {
+// 		return
+// 	}
+// 	// If the message is "ping" reply with "Pong!"
+// 	if m.Content == "ping" {
+// 		s.ChannelMessageSend(m.ChannelID, "Pong!")
+// 	}
 
-	// If the message is "pong" reply with "Ping!"
-	if m.Content == "pong" {
-		s.ChannelMessageSend(m.ChannelID, "Ping!")
-	}
-}
+// 	// If the message is "pong" reply with "Ping!"
+// 	if m.Content == "pong" {
+// 		s.ChannelMessageSend(m.ChannelID, "Ping!")
+// 	}
+// }
