@@ -11,6 +11,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"github.com/mmcdole/gofeed"
 )
 
 type Feed struct {
@@ -26,6 +27,7 @@ type Server struct {
 
 // Variables used for command line parameters
 var (
+	config []Feed
 	// 	Token string
 	// create command structure
 	// every command needs a name and description!
@@ -59,12 +61,23 @@ var (
 		},
 		"sub": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			url := i.ApplicationCommandData().Options[0].StringValue()
+			fp := gofeed.NewParser()
+			feed, err := fp.ParseURL(url)
+			if err != nil {
+				panic(err)
+			}
+			newFeed := Feed{
+				url:        url,
+				channel_id: i.ChannelID,
+				last_guid:  feed.Items[0].GUID,
+			}
+			config = append(config, newFeed)
 
 			// response
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "you sent: " + url,
+					Content: feed.Items[0].Title,
 				},
 			})
 		},
@@ -74,13 +87,11 @@ var (
 func init() {
 	// flag.StringVar(&Token, "t", "", "Bot Token")
 	// flag.Parse()
-
 	data, e := os.ReadFile("bot_config.json")
 	if e != nil {
 		panic(e)
 	}
 
-	var config []Server
 	json.Unmarshal(data, &config)
 
 }
