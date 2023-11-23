@@ -2,6 +2,7 @@ package main
 
 import (
 	// "flag"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,17 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 )
+
+type Feed struct {
+	url        string
+	channel_id string
+	last_guid  string
+}
+
+type Server struct {
+	server_id string
+	feeds     []Feed
+}
 
 // Variables used for command line parameters
 var (
@@ -47,6 +59,8 @@ var (
 		},
 		"sub": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			url := i.ApplicationCommandData().Options[0].StringValue()
+
+			// response
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
@@ -61,9 +75,18 @@ func init() {
 	// flag.StringVar(&Token, "t", "", "Bot Token")
 	// flag.Parse()
 
+	data, e := os.ReadFile("bot_config.json")
+	if e != nil {
+		panic(e)
+	}
+
+	var config []Server
+	json.Unmarshal(data, &config)
+
 }
 
 func main() {
+
 	// get token from .env file
 	err := godotenv.Load()
 	if err != nil {
@@ -113,6 +136,15 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
+	// write config file on shutdown
+	configJson, _ := json.Marshal(config)
+	err = writeFile("bot_config.json", configJson)
+
 	// Cleanly close down the Discord session.
 	dg.Close()
+}
+
+func writeFile(path string, data []byte) error {
+	err := os.WriteFile(path, data, 0600)
+	return err
 }
