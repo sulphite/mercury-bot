@@ -2,6 +2,7 @@ package main
 
 import (
 	// "flag"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -10,10 +11,24 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
+	"github.com/mmcdole/gofeed"
 )
+
+type Feed struct {
+	Url        string
+	Name       string
+	Channel_id string
+	Last_guid  string
+}
+
+type Server struct {
+	server_id string
+	feeds     []Feed
+}
 
 // Variables used for command line parameters
 var (
+	config []Feed
 	// 	Token string
 	// create command structure
 	// every command needs a name and description!
@@ -47,10 +62,24 @@ var (
 		},
 		"sub": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			url := i.ApplicationCommandData().Options[0].StringValue()
+			fp := gofeed.NewParser()
+			feed, err := fp.ParseURL(url)
+			if err != nil {
+				panic(err)
+			}
+			newFeed := Feed{
+				Url:        url,
+				Name:       feed.Title,
+				Channel_id: i.ChannelID,
+				Last_guid:  feed.Items[0].GUID,
+			}
+			config = append(config, newFeed)
+
+			// response
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "you sent: " + url,
+					Content: feed.Items[0].Title,
 				},
 			})
 		},
@@ -60,10 +89,17 @@ var (
 func init() {
 	// flag.StringVar(&Token, "t", "", "Bot Token")
 	// flag.Parse()
+	data, e := os.ReadFile("bot_config.json")
+	if e != nil {
+		panic(e)
+	}
+
+	json.Unmarshal(data, &config)
 
 }
 
 func main() {
+
 	// get token from .env file
 	err := godotenv.Load()
 	if err != nil {
@@ -113,6 +149,18 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
+	configJson, _ := json.Marshal(config)
+	err = writeFile("bot_config.json", configJson)
+	if err != nil {
+		log.Println("data was not saved successfully")
+		log.Println(err)
+	}
+
 	// Cleanly close down the Discord session.
 	dg.Close()
+}
+
+func writeFile(path string, data []byte) error {
+	err := os.WriteFile(path, data, 0600)
+	return err
 }
