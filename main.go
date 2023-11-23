@@ -15,9 +15,10 @@ import (
 )
 
 type Feed struct {
-	url        string
-	channel_id string
-	last_guid  string
+	Url        string
+	Name       string
+	Channel_id string
+	Last_guid  string
 }
 
 type Server struct {
@@ -67,9 +68,10 @@ var (
 				panic(err)
 			}
 			newFeed := Feed{
-				url:        url,
-				channel_id: i.ChannelID,
-				last_guid:  feed.Items[0].GUID,
+				Url:        url,
+				Name:       feed.Title,
+				Channel_id: i.ChannelID,
+				Last_guid:  feed.Items[0].GUID,
 			}
 			config = append(config, newFeed)
 
@@ -147,9 +149,12 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	// write config file on shutdown
 	configJson, _ := json.Marshal(config)
 	err = writeFile("bot_config.json", configJson)
+	if err != nil {
+		log.Println("data was not saved successfully")
+		log.Println(err)
+	}
 
 	// Cleanly close down the Discord session.
 	dg.Close()
