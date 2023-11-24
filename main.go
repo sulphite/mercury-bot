@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -87,8 +88,7 @@ var (
 )
 
 func init() {
-	// flag.StringVar(&Token, "t", "", "Bot Token")
-	// flag.Parse()
+
 	data, e := os.ReadFile("bot_config.json")
 	if e != nil {
 		panic(e)
@@ -142,12 +142,19 @@ func main() {
 		return
 	}
 	fmt.Println("ws connection opened")
+	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
+
+	done := make(chan bool)
+	// check feeds regularly
+	go runScheduler(dg, config, done)
 
 	// Wait here until CTRL-C or other term signal is received.
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
+
+	// shut down other goroutine
+	done <- true
 
 	configJson, _ := json.Marshal(config)
 	err = writeFile("bot_config.json", configJson)
@@ -163,4 +170,23 @@ func main() {
 func writeFile(path string, data []byte) error {
 	err := os.WriteFile(path, data, 0600)
 	return err
+}
+
+func runScheduler(session *discordgo.Session, config []Feed, done chan bool) {
+	ticker := time.NewTicker(2 * time.Minute)
+	for {
+		select {
+		case v := <-done:
+			if v {
+				return
+			}
+		case <-ticker.C:
+			for _, feed := range config {
+				_, err := session.ChannelMessageSend(feed.Channel_id, "2 minutes have elapsed!")
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}
 }
