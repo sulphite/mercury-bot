@@ -173,6 +173,7 @@ func writeFile(path string, data []byte) error {
 }
 
 func runScheduler(session *discordgo.Session, config []Feed, done chan bool) {
+	fp := gofeed.NewParser()
 	ticker := time.NewTicker(2 * time.Minute)
 	for {
 		select {
@@ -182,11 +183,26 @@ func runScheduler(session *discordgo.Session, config []Feed, done chan bool) {
 			}
 		case <-ticker.C:
 			for _, feed := range config {
-				_, err := session.ChannelMessageSend(feed.Channel_id, "2 minutes have elapsed!")
+				feeddata, err := fp.ParseURL(feed.Url)
 				if err != nil {
 					log.Println(err)
 				}
+				top := feeddata.Items[0]
+				if top.GUID != feed.Last_guid {
+					session.ChannelMessageSendEmbed(feed.Channel_id, createEmbed(top))
+				}
+
+				// _, err := session.ChannelMessageSend(feed.Channel_id, "2 minutes have elapsed!")
 			}
 		}
+	}
+}
+
+func createEmbed(feeditem *gofeed.Item) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Title:       feeditem.Title,
+		URL:         feeditem.Link,
+		Type:        "link",
+		Description: feeditem.Content,
 	}
 }
