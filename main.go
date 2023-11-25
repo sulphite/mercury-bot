@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -22,13 +23,14 @@ type Feed struct {
 	Last_guid  string
 }
 
-type Server struct {
-	server_id string
-	feeds     []Feed
-}
+// type Server struct {
+// 	server_id string
+// 	feeds     []Feed
+// }
 
 // Variables used for command line parameters
 var (
+	mu     sync.Mutex
 	config []Feed
 	// 	Token string
 	// create command structure
@@ -74,13 +76,18 @@ var (
 				Channel_id: i.ChannelID,
 				Last_guid:  feed.Items[0].GUID,
 			}
+			mu.Lock()
+			defer mu.Unlock()
 			config = append(config, newFeed)
+			embeds := make([]*discordgo.MessageEmbed, 1)
+			embeds = append(embeds, createEmbed(feed.Items[0]))
 
 			// response
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: feed.Items[0].Title,
+					Content: "You subscribed to " + feed.Title,
+					Embeds:  embeds,
 				},
 			})
 		},
@@ -88,7 +95,8 @@ var (
 )
 
 func init() {
-
+	mu.Lock()
+	defer mu.Unlock()
 	data, e := os.ReadFile("bot_config.json")
 	if e != nil {
 		panic(e)
@@ -146,7 +154,7 @@ func main() {
 
 	done := make(chan bool)
 	// check feeds regularly
-	go runScheduler(dg, config, done)
+	go runScheduler(dg, &config, done)
 
 	// Wait here until CTRL-C or other term signal is received.
 	sc := make(chan os.Signal, 1)
@@ -156,7 +164,9 @@ func main() {
 	// shut down other goroutine
 	done <- true
 
+	mu.Lock()
 	configJson, _ := json.Marshal(config)
+	mu.Unlock()
 	err = writeFile("bot_config.json", configJson)
 	if err != nil {
 		log.Println("data was not saved successfully")
@@ -172,37 +182,44 @@ func writeFile(path string, data []byte) error {
 	return err
 }
 
-func runScheduler(session *discordgo.Session, config []Feed, done chan bool) {
+func runScheduler(session *discordgo.Session, config *[]Feed, done chan bool) {
 	fp := gofeed.NewParser()
 	ticker := time.NewTicker(2 * time.Minute)
 	for {
 		select {
-		case v := <-done:
-			if v {
-				return
-			}
+		case <-done:
+			return
 		case <-ticker.C:
-			for _, feed := range config {
+			fmt.Println("checking feeds...")
+			for i := range *config {
+				feed := &(*config)[i]
 				feeddata, err := fp.ParseURL(feed.Url)
 				if err != nil {
 					log.Println(err)
 				}
 				top := feeddata.Items[0]
+				log.Print("top: ", top.GUID, "last: ", feed.Last_guid)
 				if top.GUID != feed.Last_guid {
-					session.ChannelMessageSendEmbed(feed.Channel_id, createEmbed(top))
+					session.ChannelMessageSendComplex(feed.Channel_id, &discordgo.MessageSend{
+						Content: "New content!",
+						Embeds:  []*discordgo.MessageEmbed{createEmbed(top)},
+					})
+					mu.Lock()
+					feed.Last_guid = top.GUID
+					mu.Unlock()
 				}
-
-				// _, err := session.ChannelMessageSend(feed.Channel_id, "2 minutes have elapsed!")
 			}
 		}
 	}
 }
 
 func createEmbed(feeditem *gofeed.Item) *discordgo.MessageEmbed {
-	return &discordgo.MessageEmbed{
+	myembedptr := &discordgo.MessageEmbed{
 		Title:       feeditem.Title,
 		URL:         feeditem.Link,
 		Type:        "link",
-		Description: feeditem.Content,
+		Description: feeditem.Description,
 	}
+	log.Println(*myembedptr)
+	return myembedptr
 }
