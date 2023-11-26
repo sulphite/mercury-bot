@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -21,14 +23,16 @@ type Feed struct {
 	Last_guid  string
 }
 
-type Server struct {
-	server_id string
-	feeds     []Feed
-}
+// type Server struct {
+// 	server_id string
+// 	feeds     []Feed
+// }
 
 // Variables used for command line parameters
 var (
-	config []Feed
+	mu                sync.Mutex
+	feedCheckInterval time.Duration = time.Hour
+	config            []Feed
 	// 	Token string
 	// create command structure
 	// every command needs a name and description!
@@ -73,13 +77,18 @@ var (
 				Channel_id: i.ChannelID,
 				Last_guid:  feed.Items[0].GUID,
 			}
+			mu.Lock()
+			defer mu.Unlock()
 			config = append(config, newFeed)
+			embeds := make([]*discordgo.MessageEmbed, 1)
+			embeds = append(embeds, createEmbed(feed.Items[0]))
 
 			// response
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: feed.Items[0].Title,
+					Content: "You subscribed to " + feed.Title,
+					Embeds:  embeds,
 				},
 			})
 		},
@@ -87,8 +96,8 @@ var (
 )
 
 func init() {
-	// flag.StringVar(&Token, "t", "", "Bot Token")
-	// flag.Parse()
+	mu.Lock()
+	defer mu.Unlock()
 	data, e := os.ReadFile("bot_config.json")
 	if e != nil {
 		panic(e)
@@ -142,14 +151,23 @@ func main() {
 		return
 	}
 	fmt.Println("ws connection opened")
+	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
+
+	done := make(chan bool)
+	// check feeds regularly
+	go runScheduler(dg, &config, done)
 
 	// Wait here until CTRL-C or other term signal is received.
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
+	// shut down other goroutine
+	done <- true
+
+	mu.Lock()
 	configJson, _ := json.Marshal(config)
+	mu.Unlock()
 	err = writeFile("bot_config.json", configJson)
 	if err != nil {
 		log.Println("data was not saved successfully")
@@ -163,4 +181,46 @@ func main() {
 func writeFile(path string, data []byte) error {
 	err := os.WriteFile(path, data, 0600)
 	return err
+}
+
+func runScheduler(session *discordgo.Session, config *[]Feed, done chan bool) {
+	fp := gofeed.NewParser()
+	ticker := time.NewTicker(feedCheckInterval)
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			fmt.Println("checking feeds...")
+			for i := range *config {
+				feed := &(*config)[i]
+				feeddata, err := fp.ParseURL(feed.Url)
+				if err != nil {
+					log.Println(err)
+				}
+				top := feeddata.Items[0]
+				log.Print("top: ", top.GUID, "last: ", feed.Last_guid)
+				if top.GUID != feed.Last_guid {
+					session.ChannelMessageSendComplex(feed.Channel_id, &discordgo.MessageSend{
+						Content: "New content!",
+						Embeds:  []*discordgo.MessageEmbed{createEmbed(top)},
+					})
+					mu.Lock()
+					feed.Last_guid = top.GUID
+					mu.Unlock()
+				}
+			}
+		}
+	}
+}
+
+func createEmbed(feeditem *gofeed.Item) *discordgo.MessageEmbed {
+	myembedptr := &discordgo.MessageEmbed{
+		Title:       feeditem.Title,
+		URL:         feeditem.Link,
+		Type:        "link",
+		Description: feeditem.Description,
+	}
+	log.Println(*myembedptr)
+	return myembedptr
 }
