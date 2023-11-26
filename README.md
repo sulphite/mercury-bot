@@ -14,6 +14,8 @@ a discord gopher that subscribes to RSS feeds and posts updates to your server.
 
 `/unsub name` bot will search list of feeds for a match and unsubscribe
 
+`/list` lists subscribed feeds
+
 ## host your own
 
 1. For this you will need to create a new application in the discord developer portal, so you can get a **bot token** and **application id**.
