@@ -30,8 +30,9 @@ type Feed struct {
 
 // Variables used for command line parameters
 var (
-	mu     sync.Mutex
-	config []Feed
+	mu                sync.Mutex
+	feedCheckInterval time.Duration = time.Hour
+	config            []Feed
 	// 	Token string
 	// create command structure
 	// every command needs a name and description!
@@ -184,7 +185,7 @@ func writeFile(path string, data []byte) error {
 
 func runScheduler(session *discordgo.Session, config *[]Feed, done chan bool) {
 	fp := gofeed.NewParser()
-	ticker := time.NewTicker(2 * time.Minute)
+	ticker := time.NewTicker(feedCheckInterval)
 	for {
 		select {
 		case <-done:
