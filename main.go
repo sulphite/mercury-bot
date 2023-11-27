@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -42,6 +43,10 @@ var (
 			Description: "Basic command",
 		},
 		{
+			Name:        "list",
+			Description: "list all subscribed feeds",
+		},
+		{
 			Name:        "sub",
 			Description: "subscribe to a feed",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -49,6 +54,18 @@ var (
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "url",
 					Description: "The URL of the feed",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "unsub",
+			Description: "unsubscribe from a feed",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "The name of the feed",
 					Required:    true,
 				},
 			},
@@ -61,6 +78,21 @@ var (
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: "Hello i'm mercury!",
+				},
+			})
+		},
+		"list": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			response := ""
+			mu.Lock()
+			for _, feed := range config {
+				response += feed.Name + "\n"
+			}
+			mu.Unlock()
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: response,
 				},
 			})
 		},
@@ -89,6 +121,30 @@ var (
 				Data: &discordgo.InteractionResponseData{
 					Content: "You subscribed to " + feed.Title,
 					Embeds:  embeds,
+				},
+			})
+		},
+		"unsub": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			inputName := i.ApplicationCommandData().Options[0].StringValue()
+			inputName = strings.ToLower(inputName)
+			mu.Lock()
+			defer mu.Unlock()
+			for index, feed := range config {
+				if strings.Contains(strings.ToLower(feed.Name), inputName) {
+					s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+						Type: discordgo.InteractionResponseChannelMessageWithSource,
+						Data: &discordgo.InteractionResponseData{
+							Content: "deleted " + feed.Name,
+						},
+					})
+					deleteFeedAtIndex(index)
+					return
+				}
+			}
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "I couldn't find that. Why don't you try the /list command?",
 				},
 			})
 		},
@@ -212,6 +268,10 @@ func runScheduler(session *discordgo.Session, config *[]Feed, done chan bool) {
 			}
 		}
 	}
+}
+
+func deleteFeedAtIndex(index int) {
+	config = append(config[:index], config[index+1:]...)
 }
 
 func createEmbed(feeditem *gofeed.Item) *discordgo.MessageEmbed {
