@@ -42,6 +42,10 @@ var (
 			Description: "Basic command",
 		},
 		{
+			Name:        "list",
+			Description: "list all subscribed feeds",
+		},
+		{
 			Name:        "sub",
 			Description: "subscribe to a feed",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -61,6 +65,21 @@ var (
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
 					Content: "Hello i'm mercury!",
+				},
+			})
+		},
+		"list": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			response := ""
+			mu.Lock()
+			for _, feed := range config {
+				response += feed.Name + "\n"
+			}
+			mu.Unlock()
+
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: response,
 				},
 			})
 		},
