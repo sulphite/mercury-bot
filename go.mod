@@ -1,6 +1,6 @@
 module github.com/sulphite/mercury-bot
 
-go 1.21.4
+go 1.20.10
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
