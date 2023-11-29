@@ -1,3 +1,1 @@
-{
-  "842439481189072897": [{"Url":"https://www.smbc-comics.com/comic/rss","Name":"Saturday Morning Breakfast Cereal","Channel_id":"842439481679544322","Last_guid":"https://www.smbc-comics.com/comic/ism"},{"Url":"https://css-tricks.com/feed/","Name":"CSS-Tricks","Channel_id":"842439481679544322","Last_guid":"https://css-tricks.com/?p=377305"}]
-}
+{"842439481189072897":[{"Url":"https://www.smbc-comics.com/comic/rss","Name":"Saturday Morning Breakfast Cereal","Channel_id":"842439481679544322","Last_guid":"https://www.smbc-comics.com/comic/ism"},{"Url":"https://css-tricks.com/feed/","Name":"CSS-Tricks","Channel_id":"842439481679544322","Last_guid":"https://css-tricks.com/?p=377305"},{"Url":"https://xkcd.com/atom.xml","Name":"xkcd.com","Channel_id":"842439481679544322","Last_guid":"https://xkcd.com/2860/"}]}
