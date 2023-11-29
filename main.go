@@ -146,8 +146,8 @@ var (
 			})
 		},
 	}
-
 )
+
 func onGuildJoin(s *discordgo.Session, g *discordgo.GuildCreate) {
 	if g.Guild.Unavailable {
 		return
@@ -159,7 +159,13 @@ func onGuildJoin(s *discordgo.Session, g *discordgo.GuildCreate) {
 		config[g.Guild.ID] = make([]Feed, 0)
 		log.Println("joined guild", g.Guild.ID)
 	}
-	return
+}
+
+func onGuildDelete(s *discordgo.Session, g *discordgo.GuildDelete) {
+	mu.Lock()
+	defer mu.Unlock()
+	delete(config, g.Guild.ID)
+	log.Println("left guild", g.Guild.ID)
 }
 
 func init() {
@@ -210,14 +216,8 @@ func main() {
 			handlerFunc(s, i)
 		}
 	})
-
-	dg.AddHandler(func(s *discordgo.Session, ev *discordgo.Event)) {
-		switch ev.Type {
-		case "GUILD_CREATE":
-
-		case "GUILD_DELETE":
-		}
-	}
+	dg.AddHandler(onGuildDelete)
+	dg.AddHandler(onGuildJoin)
 
 	// In this example, we only care about receiving message events.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
