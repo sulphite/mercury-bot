@@ -24,16 +24,12 @@ type Feed struct {
 	Last_guid  string
 }
 
-// type Server struct {
-// 	server_id string
-// 	feeds     []Feed
-// }
+type Config map[string][]Feed
 
-// Variables used for command line parameters
 var (
 	mu                sync.Mutex
 	feedCheckInterval time.Duration = time.Hour
-	config            []Feed
+	config            Config
 	// 	Token string
 	// create command structure
 	// every command needs a name and description!
@@ -74,6 +70,7 @@ var (
 	// create command handlers
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"test": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			log.Println(i.GuildID)
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
@@ -84,7 +81,7 @@ var (
 		"list": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			response := ""
 			mu.Lock()
-			for _, feed := range config {
+			for _, feed := range config[i.GuildID] {
 				response += feed.Name + "\n"
 			}
 			mu.Unlock()
@@ -111,7 +108,7 @@ var (
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			config = append(config, newFeed)
+			config[i.GuildID] = append(config[i.GuildID], newFeed)
 			embeds := make([]*discordgo.MessageEmbed, 1)
 			embeds = append(embeds, createEmbed(feed.Items[0]))
 
@@ -129,7 +126,7 @@ var (
 			inputName = strings.ToLower(inputName)
 			mu.Lock()
 			defer mu.Unlock()
-			for index, feed := range config {
+			for index, feed := range config[i.GuildID] {
 				if strings.Contains(strings.ToLower(feed.Name), inputName) {
 					s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 						Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -137,7 +134,7 @@ var (
 							Content: "deleted " + feed.Name,
 						},
 					})
-					deleteFeedAtIndex(index)
+					deleteFeedAtIndex(index, i.GuildID)
 					return
 				}
 			}
@@ -211,7 +208,9 @@ func main() {
 
 	done := make(chan bool)
 	// check feeds regularly
-	go runScheduler(dg, &config, done)
+	for _, feeds := range config {
+		go runScheduler(dg, &feeds, done)
+	}
 
 	// Wait here until CTRL-C or other term signal is received.
 	sc := make(chan os.Signal, 1)
@@ -247,7 +246,7 @@ func runScheduler(session *discordgo.Session, config *[]Feed, done chan bool) {
 		case <-done:
 			return
 		case <-ticker.C:
-			fmt.Println("checking feeds...")
+			log.Println("checking feeds...")
 			for i := range *config {
 				feed := &(*config)[i]
 				feeddata, err := fp.ParseURL(feed.Url)
@@ -270,8 +269,9 @@ func runScheduler(session *discordgo.Session, config *[]Feed, done chan bool) {
 	}
 }
 
-func deleteFeedAtIndex(index int) {
-	config = append(config[:index], config[index+1:]...)
+func deleteFeedAtIndex(index int, serverID string) {
+	feeds := config[serverID]
+	config[serverID] = append(feeds[:index], feeds[index+1:]...)
 }
 
 func createEmbed(feeditem *gofeed.Item) *discordgo.MessageEmbed {
