@@ -8,9 +8,9 @@ a discord gopher that subscribes to RSS feeds and posts updates to your server.
 
 ## commands
 
-`/test` - bot will say hello
+`/test` bot will say hello
 
-`/sub url` bot will check your url and subscribe
+`/sub url` bot will check your url and subscribe (can handle rss, xml, atom)
 
 `/unsub name` bot will search list of feeds for a match and unsubscribe
 
