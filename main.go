@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 	"github.com/mmcdole/gofeed"
@@ -67,6 +68,7 @@ var (
 			},
 		},
 	}
+
 	// create command handlers
 	commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"test": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -300,11 +302,18 @@ func deleteFeedAtIndex(index int, serverID string) {
 }
 
 func createEmbed(feeditem *gofeed.Item) *discordgo.MessageEmbed {
+	converter := md.NewConverter("", true, nil)
+	markdown, err := converter.ConvertString(feeditem.Description)
+	if err != nil {
+		markdown = feeditem.Description
+		log.Println(err)
+	}
+
 	myembedptr := &discordgo.MessageEmbed{
 		Title:       feeditem.Title,
 		URL:         feeditem.Link,
 		Type:        "link",
-		Description: feeditem.Description,
+		Description: markdown,
 	}
 	log.Println(*myembedptr)
 	return myembedptr
